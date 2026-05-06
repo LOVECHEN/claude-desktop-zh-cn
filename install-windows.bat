@@ -8,7 +8,7 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install_windows.ps1" install
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install_windows.ps1" install
 set EXITCODE=%ERRORLEVEL%
 
 echo.
