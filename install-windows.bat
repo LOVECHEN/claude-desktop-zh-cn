@@ -31,26 +31,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo === Claude Desktop Windows 简体中文补丁 ===
-echo.
-echo [1] 安装中文补丁
-echo [2] 恢复原样 / 卸载补丁
-echo [Q] 退出
-echo.
-choice /C 12Q /N /M "请选择操作 [1/2/Q]: "
-
-if errorlevel 3 exit /b 0
-if errorlevel 2 goto uninstall
-set ACTION=install
-goto run
-
-:uninstall
-set ACTION=uninstall
-
-:run
-
-echo.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install_windows.ps1" %ACTION%
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install_windows.ps1" -Interactive
 set EXITCODE=%ERRORLEVEL%
 
 echo.

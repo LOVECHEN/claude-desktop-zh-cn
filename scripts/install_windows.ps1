@@ -1,17 +1,64 @@
 ﻿param(
+    [switch]$Interactive,
+
     [Parameter(Position = 0)]
     [ValidateSet("install", "uninstall")]
-    [string]$Action = "install"
+    [string]$Action = "install",
+
+    [Parameter(Position = 1)]
+    [ValidateSet("zh-CN", "zh-TW", "zh-HK")]
+    [string]$Language = "zh-CN"
 )
 
 $ErrorActionPreference = "Stop"
-$LanguageCode = "zh-CN"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-$LanguageListPattern = '\["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"\]'
-$LanguageListReplacement = '["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID","zh-CN"]'
+$BaseLanguageList = '["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"'
+$LanguageListPattern = [System.Text.RegularExpressions.Regex]::Escape($BaseLanguageList) + '(?:(?:,"zh-CN")|(?:,"zh-TW")|(?:,"zh-HK"))*\]'
 $AsarPatchTarget = ".vite/build/index.js"
 $AsarIntegrityBlockSize = 4 * 1024 * 1024
 $script:CurrentBackupSetPath = $null
+
+function Read-InteractiveSelection {
+    Write-Host "=== Claude Desktop Windows 中文补丁 ==="
+    Write-Host ""
+    Write-Host "[1] 安装简体中文"
+    Write-Host "[2] 安装繁体中文（中国台湾）"
+    Write-Host "[3] 安装繁体中文（中国香港）"
+    Write-Host "[4] 恢复原样 / 卸载补丁"
+    Write-Host "[Q] 退出"
+    Write-Host ""
+
+    while ($true) {
+        $selection = (Read-Host "请选择操作 [1/2/3/4/Q]").Trim()
+        switch -Regex ($selection) {
+            '^[1]$' { return @{ Action = "install"; Language = "zh-CN" } }
+            '^[2]$' { return @{ Action = "install"; Language = "zh-TW" } }
+            '^[3]$' { return @{ Action = "install"; Language = "zh-HK" } }
+            '^[4]$' { return @{ Action = "uninstall"; Language = "zh-CN" } }
+            '^[Qq]$' { exit 0 }
+            default { Write-Host "请输入 1、2、3、4 或 Q。" -ForegroundColor Yellow }
+        }
+    }
+}
+
+if ($Interactive) {
+    $interactiveSelection = Read-InteractiveSelection
+    $Action = $interactiveSelection.Action
+    $Language = $interactiveSelection.Language
+}
+
+$LanguageCode = $Language
+
+function Get-LanguageLabel {
+    param([string]$Code)
+    switch ($Code) {
+        "zh-CN" { return "简体中文" }
+        "zh-TW" { return "繁体中文（中国台湾）" }
+        "zh-HK" { return "繁体中文（中国香港）" }
+        default { return $Code }
+    }
+}
 
 function Write-Step {
     param([string]$Message)
@@ -222,13 +269,15 @@ function Restore-LatestBackup {
 }
 
 function Get-LanguageResources {
+    param([string]$Lang)
+
     $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
     $projectDir = Split-Path -Parent $scriptDir
     $resourcesDir = Join-Path $projectDir "resources"
     $resources = @{
-        Frontend = Join-Path $resourcesDir "frontend-zh-CN.json"
-        Desktop = Join-Path $resourcesDir "desktop-zh-CN.json"
-        Statsig = Join-Path $resourcesDir "statsig-zh-CN.json"
+        Frontend = Join-Path $resourcesDir "frontend-$Lang.json"
+        Desktop = Join-Path $resourcesDir "desktop-$Lang.json"
+        Statsig = Join-Path $resourcesDir "statsig-$Lang.json"
     }
 
     foreach ($path in $resources.Values) {
@@ -259,7 +308,8 @@ function Enable-WriteAccess {
 function Install-LanguageFiles {
     param(
         [string]$ResourcesPath,
-        [hashtable]$Pack
+        [hashtable]$Pack,
+        [string]$Lang
     )
 
     $i18nDir = Join-Path $ResourcesPath "ion-dist\i18n"
@@ -267,14 +317,14 @@ function Install-LanguageFiles {
     New-Item -ItemType Directory -Path $i18nDir -Force | Out-Null
     New-Item -ItemType Directory -Path $statsigDir -Force | Out-Null
 
-    Copy-Item $Pack["Frontend"] (Join-Path $i18nDir "zh-CN.json") -Force
-    Write-Host "  installed ion-dist/i18n/zh-CN.json" -ForegroundColor Green
+    Copy-Item $Pack["Frontend"] (Join-Path $i18nDir "$Lang.json") -Force
+    Write-Host "  installed ion-dist/i18n/$Lang.json" -ForegroundColor Green
 
-    Copy-Item $Pack["Desktop"] (Join-Path $ResourcesPath "zh-CN.json") -Force
-    Write-Host "  installed resources/zh-CN.json" -ForegroundColor Green
+    Copy-Item $Pack["Desktop"] (Join-Path $ResourcesPath "$Lang.json") -Force
+    Write-Host "  installed resources/$Lang.json" -ForegroundColor Green
 
-    Copy-Item $Pack["Statsig"] (Join-Path $statsigDir "zh-CN.json") -Force
-    Write-Host "  installed ion-dist/i18n/statsig/zh-CN.json" -ForegroundColor Green
+    Copy-Item $Pack["Statsig"] (Join-Path $statsigDir "$Lang.json") -Force
+    Write-Host "  installed ion-dist/i18n/statsig/$Lang.json" -ForegroundColor Green
 }
 
 function Align-4 {
@@ -549,7 +599,10 @@ function Sync-ClaudeExeAsarIntegrity {
 }
 
 function Register-Language {
-    param([string]$ResourcesPath)
+    param(
+        [string]$ResourcesPath,
+        [string]$Lang
+    )
 
     $assetsDir = Join-Path $ResourcesPath "ion-dist\assets\v1"
     $jsFiles = @(Get-ChildItem (Join-Path $assetsDir "index-*.js") -ErrorAction SilentlyContinue)
@@ -558,27 +611,58 @@ function Register-Language {
     }
 
     $regex = [System.Text.RegularExpressions.Regex]::new($LanguageListPattern)
+    $replacement = "$BaseLanguageList,`"$Lang`"]"
     $changed = 0
     $already = 0
     foreach ($file in $jsFiles) {
         $text = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8)
-        if ($text.Contains('"zh-CN"')) {
-            Write-Host "  language already registered: $($file.Name)" -ForegroundColor Green
+        if ($text.Contains($replacement)) {
+            Write-Host "  $Lang already registered: $($file.Name)" -ForegroundColor Green
             $already += 1
             continue
         }
 
         if ($regex.IsMatch($text)) {
-            $updated = $regex.Replace($text, $LanguageListReplacement, 1)
+            $updated = $regex.Replace($text, $replacement, 1)
             Backup-ModifiedFile $ResourcesPath $file.FullName
             [System.IO.File]::WriteAllText($file.FullName, $updated, $Utf8NoBom)
-            Write-Host "  patched language whitelist: $($file.Name)" -ForegroundColor Green
+            Write-Host "  patched language whitelist for ${Lang}: $($file.Name)" -ForegroundColor Green
             $changed += 1
         }
     }
 
     if (($changed + $already) -eq 0) {
-        throw "未能注册 zh-CN，Claude 前端 bundle 格式可能已经变化。"
+        throw "未能注册中文语言，Claude 前端 bundle 格式可能已经变化。"
+    }
+}
+
+function Patch-LanguageDisplayNames {
+    param([string]$ResourcesPath)
+
+    $assetsDir = Join-Path $ResourcesPath "ion-dist\assets\v1"
+    $jsFiles = @(Get-ChildItem (Join-Path $assetsDir "index-*.js") -ErrorAction SilentlyContinue)
+    if ($jsFiles.Count -eq 0) {
+        throw "未找到前端 index-*.js: $assetsDir"
+    }
+
+    $marker = "__claudeZhLabelPatch"
+    $patch = ';(()=>{const e=Intl.DisplayNames&&Intl.DisplayNames.prototype;if(!e||e.__claudeZhLabelPatch)return;const n=e.of;e.of=function(e){const t=String(e);return t==="zh-CN"?"简体中文":t==="zh-HK"?"繁体中文（中国香港）":t==="zh-TW"?"繁体中文（中国台湾）":n.call(this,e)},Object.defineProperty(e,"__claudeZhLabelPatch",{value:!0})})();'
+    $patchedFiles = 0
+    foreach ($file in $jsFiles) {
+        $text = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8)
+        if ($text.Contains($marker)) {
+            Write-Host "  language display names already patched: $($file.Name)" -ForegroundColor Green
+            continue
+        }
+
+        Backup-ModifiedFile $ResourcesPath $file.FullName
+        [System.IO.File]::WriteAllText($file.FullName, ($text + $patch), $Utf8NoBom)
+        Write-Host "  patched language display names: $($file.Name)" -ForegroundColor Green
+        $patchedFiles += 1
+    }
+
+    if ($patchedFiles -eq 0) {
+        Write-Host "  no language display name changes needed" -ForegroundColor Green
     }
 }
 
@@ -589,10 +673,17 @@ function Unregister-Language {
     $jsFiles = @(Get-ChildItem (Join-Path $assetsDir "index-*.js") -ErrorAction SilentlyContinue)
     foreach ($file in $jsFiles) {
         $text = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8)
-        if ($text.Contains(',"zh-CN"')) {
-            $updated = $text.Replace(',"zh-CN"', '')
+        $updated = $text
+        $changed = $false
+        foreach ($lang in @(',"zh-CN"', ',"zh-TW"', ',"zh-HK"')) {
+            if ($updated.Contains($lang)) {
+                $updated = $updated.Replace($lang, '')
+                $changed = $true
+            }
+        }
+        if ($changed) {
             [System.IO.File]::WriteAllText($file.FullName, $updated, $Utf8NoBom)
-            Write-Host "  removed language whitelist entry: $($file.Name)" -ForegroundColor Green
+            Write-Host "  removed language whitelist entries: $($file.Name)" -ForegroundColor Green
         }
     }
 }
@@ -768,6 +859,79 @@ function Patch-Custom3PModelValidation {
     Write-Host "  patched custom 3P model-name validation in app.asar" -ForegroundColor Green
 }
 
+function Patch-HardcodedMainProcessMenuLabels {
+    param([string]$ResourcesPath)
+
+    $asarPath = Join-Path $ResourcesPath "app.asar"
+    Require-File $asarPath
+
+    $replacements = @(
+        @("Enable Main Process Debugger", "启用主进程调试器"),
+        @("Record Performance Trace", "记录性能跟踪"),
+        @("Write Main Process Heap Snapshot", "写入主进程堆快照"),
+        @("Record Memory Trace (auto-stop)", "记录内存跟踪 (自动)")
+    )
+
+    $data = [System.IO.File]::ReadAllBytes($asarPath)
+    $parsed = Read-AsarHeader $data $asarPath
+    $headerSize = $parsed["HeaderSize"]
+    $header = $parsed["Header"]
+    $entry = Get-AsarFileEntry $header $AsarPatchTarget
+
+    $contentOffset = [int64](8 + $headerSize + [int64]$entry.offset)
+    $contentSize = [int64]$entry.size
+    $contentEnd = $contentOffset + $contentSize
+    if (($contentOffset -lt 0) -or ($contentEnd -gt $data.Length)) {
+        throw "Unsupported app.asar file bounds for $AsarPatchTarget."
+    }
+
+    $content = [byte[]]::new([int]$contentSize)
+    [System.Array]::Copy($data, [int]$contentOffset, $content, 0, [int]$contentSize)
+    $text = [System.Text.Encoding]::UTF8.GetString($content)
+    $patched = $text
+    $count = 0
+
+    foreach ($pair in $replacements) {
+        $source = $pair[0]
+        $target = $pair[1]
+        $sourceLength = [System.Text.Encoding]::UTF8.GetByteCount($source)
+        $targetLength = [System.Text.Encoding]::UTF8.GetByteCount($target)
+        if ($targetLength -gt $sourceLength) {
+            throw "Internal patch error: menu label replacement is longer than source: $source"
+        }
+
+        if ($patched.Contains($target)) {
+            continue
+        }
+        if ($patched.Contains($source)) {
+            $paddedTarget = $target + (" " * ($sourceLength - $targetLength))
+            $patched = $patched.Replace($source, $paddedTarget)
+            $count += 1
+        }
+    }
+
+    if ($count -eq 0) {
+        Write-Host "  hardcoded main-process menu labels already patched" -ForegroundColor Green
+        return
+    }
+
+    $patchedContent = [System.Text.Encoding]::UTF8.GetBytes($patched)
+    if ($patchedContent.Length -ne $content.Length) {
+        throw "Internal patch error: menu label replacement changed bundle size."
+    }
+
+    Backup-ModifiedFile $ResourcesPath $asarPath
+    [System.Array]::Copy($patchedContent, 0, $data, [int]$contentOffset, $patchedContent.Length)
+    $entry.integrity = Get-AsarFileIntegrity $patchedContent
+    $updatedHeaderString = $header | ConvertTo-Json -Compress -Depth 100
+    $updatedHeader = Encode-AsarHeader $updatedHeaderString $headerSize
+    [System.Array]::Copy($updatedHeader, 0, $data, 0, $updatedHeader.Length)
+
+    [System.IO.File]::WriteAllBytes($asarPath, $data)
+    Sync-ClaudeExeAsarIntegrity $ResourcesPath
+    Write-Host "  patched hardcoded main-process menu labels: $count replacements" -ForegroundColor Green
+}
+
 function Set-ClaudeLocale {
     param([string]$Locale)
 
@@ -812,12 +976,20 @@ function Remove-LanguageFiles {
     $targets = @(
         (Join-Path $ResourcesPath "ion-dist\i18n\zh-CN.json"),
         (Join-Path $ResourcesPath "zh-CN.json"),
-        (Join-Path $ResourcesPath "ion-dist\i18n\statsig\zh-CN.json")
+        (Join-Path $ResourcesPath "ion-dist\i18n\statsig\zh-CN.json"),
+        (Join-Path $ResourcesPath "ion-dist\i18n\zh-TW.json"),
+        (Join-Path $ResourcesPath "zh-TW.json"),
+        (Join-Path $ResourcesPath "ion-dist\i18n\statsig\zh-TW.json"),
+        (Join-Path $ResourcesPath "ion-dist\i18n\zh-HK.json"),
+        (Join-Path $ResourcesPath "zh-HK.json"),
+        (Join-Path $ResourcesPath "ion-dist\i18n\statsig\zh-HK.json")
     )
 
     foreach ($target in $targets) {
         Remove-Item $target -Force -ErrorAction SilentlyContinue
-        Write-Host "  removed: $target" -ForegroundColor Green
+        if (Test-Path $target) {
+            Write-Host "  removed: $target" -ForegroundColor Green
+        }
     }
 }
 
@@ -849,10 +1021,11 @@ function Restart-Claude {
 }
 
 function Install-WindowsLanguagePack {
-    Write-Host "=== Claude Desktop Windows 简体中文补丁 ===" -ForegroundColor Cyan
+    $label = Get-LanguageLabel $LanguageCode
+    Write-Host "=== Claude Desktop Windows $label 补丁 ===" -ForegroundColor Cyan
 
     Write-Step "[1/8] 检查语言资源"
-    $pack = Get-LanguageResources
+    $pack = Get-LanguageResources $LanguageCode
 
     Write-Step "[2/8] 查找 Claude Desktop"
     $paths = Get-ClaudeResourcesPath
@@ -867,14 +1040,16 @@ function Install-WindowsLanguagePack {
     Write-Step "[3/8] 准备写入权限"
     Enable-WriteAccess $resourcesPath
 
-    Write-Step "[4/8] 写入中文资源"
-    Install-LanguageFiles $resourcesPath $pack
+    Write-Step "[4/8] 写入 $label 资源"
+    Install-LanguageFiles $resourcesPath $pack $LanguageCode
 
-    Write-Step "[5/8] 注册 zh-CN 语言"
-    Register-Language $resourcesPath
+    Write-Step "[5/8] 注册中文语言"
+    Register-Language $resourcesPath $LanguageCode
 
     Write-Step "[6/8] 汉化硬编码界面文本"
     Patch-HardcodedFrontendStrings $resourcesPath
+    Patch-LanguageDisplayNames $resourcesPath
+    Patch-HardcodedMainProcessMenuLabels $resourcesPath
 
     Write-Step "[7/8] 修复第三方模型名校验"
     Patch-Custom3PModelValidation $resourcesPath
@@ -886,11 +1061,11 @@ function Install-WindowsLanguagePack {
     Restart-Claude $claudePath
 
     Write-Host ""
-    Write-Host "安装完成。如果界面未立即切换，请在 Language 中选择 中文（中国）。" -ForegroundColor Green
+    Write-Host "安装完成。如果界面未立即切换，请在 Language 中选择 $label。" -ForegroundColor Green
 }
 
 function Uninstall-WindowsLanguagePack {
-    Write-Host "=== Claude Desktop Windows 简体中文补丁卸载 ===" -ForegroundColor Cyan
+    Write-Host "=== Claude Desktop Windows 中文补丁卸载 ===" -ForegroundColor Cyan
 
     $paths = Get-ClaudeResourcesPath
     $claudePath = $paths["App"]
