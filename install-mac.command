@@ -56,7 +56,14 @@ if [ "$ACTION" != "restore" ]; then
   echo
 fi
 
-if [ "$(id -u)" -ne 0 ]; then
+NEEDS_SUDO=1
+for arg in "$@"; do
+  if [ "$arg" = "--dry-run" ]; then
+    NEEDS_SUDO=0
+  fi
+done
+
+if [ "$(id -u)" -ne 0 ] && [ "$NEEDS_SUDO" -eq 1 ]; then
   echo "需要管理员权限来替换 /Applications/Claude.app。"
   echo "请按提示输入这台 Mac 的登录密码。"
   echo
@@ -74,7 +81,10 @@ fi
 
 USER_HOME="$HOME"
 if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
-  USER_HOME="/Users/$SUDO_USER"
+  USER_HOME="$("$PYTHON" -c 'import pwd, sys; print(pwd.getpwnam(sys.argv[1]).pw_dir)' "$SUDO_USER" 2>/dev/null || true)"
+  if [ -z "$USER_HOME" ] || [ ! -d "$USER_HOME" ]; then
+    USER_HOME="$(eval echo "~$SUDO_USER")"
+  fi
 fi
 
 if [ "$ACTION" = "restore" ]; then

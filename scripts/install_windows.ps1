@@ -101,6 +101,38 @@ function Get-ClaudeResourcesPath {
     }
 }
 
+function Get-ClaudeConfigPaths {
+    if (-not $env:LOCALAPPDATA) {
+        return @()
+    }
+
+    $packageNames = @()
+    $packages = @(Get-AppxPackage -Name "Claude" -ErrorAction SilentlyContinue)
+    foreach ($package in $packages) {
+        if ($package.PackageFamilyName) {
+            $packageNames += $package.PackageFamilyName
+        }
+    }
+
+    if ($packageNames.Count -eq 0) {
+        $packageRoot = Join-Path $env:LOCALAPPDATA "Packages"
+        $packageDirs = @(Get-ChildItem (Join-Path $packageRoot "Claude_*") -Directory -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending)
+        foreach ($packageDir in $packageDirs) {
+            $packageNames += $packageDir.Name
+        }
+    }
+
+    $configPaths = @()
+    foreach ($packageName in @($packageNames | Select-Object -Unique)) {
+        $packagePath = Join-Path (Join-Path $env:LOCALAPPDATA "Packages") $packageName
+        $configPaths += Join-Path $packagePath "LocalCache\Roaming\Claude\config.json"
+        $configPaths += Join-Path $packagePath "LocalCache\Roaming\Claude-3p\config.json"
+    }
+
+    return @($configPaths | Select-Object -Unique)
+}
+
 function Grant-WriteAccess {
     param([string]$Path)
 
@@ -1102,10 +1134,11 @@ function Set-ClaudeLocale {
         return
     }
 
-    $configPaths = @(
-        (Join-Path $env:LOCALAPPDATA "Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\config.json"),
-        (Join-Path $env:LOCALAPPDATA "Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude-3p\config.json")
-    )
+    $configPaths = Get-ClaudeConfigPaths
+    if ($configPaths.Count -eq 0) {
+        Write-Host "  [警告] 未找到 Claude 用户配置目录，跳过用户配置。" -ForegroundColor DarkYellow
+        return
+    }
 
     foreach ($configPath in $configPaths) {
         $parent = Split-Path -Parent $configPath

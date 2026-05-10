@@ -918,7 +918,7 @@ def main() -> int:
         in_applications = args.app.resolve().as_posix().startswith("/Applications/")
     except Exception:
         in_applications = str(args.app).startswith("/Applications/")
-    if os.geteuid() != 0 and in_applications:
+    if os.geteuid() != 0 and in_applications and not args.dry_run:
         print("This usually needs sudo because /Applications is protected.", file=sys.stderr)
 
     if args.restore:

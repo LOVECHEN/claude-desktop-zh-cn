@@ -132,9 +132,7 @@ chmod +x install-mac.command
 
 ## 注意
 
-Claude Desktop 更新后可能会覆盖补丁，需要重新运行 `install-mac.command`。
-
-Windows 版更新后也可能被覆盖，需要重新运行 `install-windows.bat`。
+Claude Desktop 更新后可能会覆盖补丁，需要重新运行 `install-mac.command` 或 `install-windows.bat`。
 
 3P gateway 模型名校验补丁只解决启动阶段 `inferenceModels` 名称被拒的问题，不保证第三方模型完全兼容 Claude Desktop / Claude Code 的协议与工具调用行为。Claude Desktop 更新后如果内部 bundle 结构变化，脚本会停止并提示补丁失败，而不是猜测修改。
 
