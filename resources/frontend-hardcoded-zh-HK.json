@@ -23,5 +23,20 @@
   ["\"Six-digit hex (#RRGGBB). Applied exactly as configured; not theme-adapted.\"", "\"六位十六進制顏色（#RRGGBB）。會完全按配置套用；不會隨主題調整。\""],
   ["\"Text color\"", "\"文本顏色\""],
   ["\"Link URL\"", "\"連結 URL\""],
-  ["\"Optional HTTPS URL. The banner text becomes a link when set.\"", "\"可選 HTTPS URL。設置後，橫幅文本會變成連結。\""]
+  ["\"Optional HTTPS URL. The banner text becomes a link when set.\"", "\"可選 HTTPS URL。設置後，橫幅文本會變成連結。\""],
+  ["cancelText:y=\"Cancel\"", "cancelText:y=\"取消\""],
+  ["title:\"Disable claude:// deep-link handling\"", "title:\"停用 claude:// 深層連結處理\""],
+  ["\"Stop external apps and websites from opening Cowork via claude:// links.\"", "\"阻止外部應用程式和網站透過 claude:// 連結開啟 Cowork。\""],
+  ["label:\"Display name\"", "label:\"顯示名稱\""],
+  ["\"Shown in the model picker. Leave blank to auto-format from the ID.\"", "\"顯示在模型選擇器中。留空則根據 ID 自動格式化。\""],
+  ["Doesn't look like an Anthropic model — ", "看起來不像 Anthropic 模型 — "],
+  ["\"expected a gateway model route referencing an Anthropic model (e.g. claude-sonnet-4-5, anthropic/claude-*). Name routes to match the underlying model.\"", "\"需要一個引用 Anthropic 模型的閘道模型路由（例如 claude-sonnet-4-5、anthropic/claude-*）。路由名稱應與底層模型一致。\""],
+  ["\"expected a Foundry deployment name referencing an Anthropic model (e.g. claude-sonnet-4-5). Name deployments to match the underlying model.\"", "\"需要一個引用 Anthropic 模型的 Foundry 部署名稱（例如 claude-sonnet-4-5）。部署名稱應與底層模型一致。\""],
+  ["defaultMessage:\"Paused\",id:\"C2iTEHtK//\"", "defaultMessage:\"已暫停\",id:\"C2iTEHtK//\""],
+  ["t?\"Completed\":\"Paused\"", "t?\"已完成\":\"已暫停\""],
+  ["zHt={nextRun:\"Next run\",name:\"Name\"}", "zHt={nextRun:\"下次執行\",name:\"任務名稱\"}"],
+  ["hint:\"Full URL of the inference gateway endpoint.\"", "hint:\"推理閘道端點的完整 URL。\""],
+  ["hint:\"How the gateway credential is sent. Choose Bearer or x-api-key for a static key or credential-helper output; choose SSO to have each user sign in via your identity provider.\"", "hint:\"閘道憑證的傳送方式。靜態密鑰或憑證輔助腳本輸出請選擇 Bearer 或 x-api-key；如需每位用户透過你的身份提供者登入，請選擇 SSO。\""],
+  ["hint:\"Org-pushed MCP servers — remote (HTTP/SSE) or local (stdio command). May embed bearer tokens.\"", "hint:\"組織推送的 MCP 伺服器：遠端（HTTP/SSE）或本機（stdio 命令）。可能嵌入 Bearer 權杖。\""],
+  ["reason:\"Crash and error reports are how we diagnose failures specific to your inference setup. Support turnaround will be slower without them.\"", "reason:\"崩潰和錯誤報告用於診斷你推理設定中特定的故障。沒有這些報告，支援處理會更慢。\""]
 ]
