@@ -21,7 +21,7 @@ body:
     validations:
       required: true
       
-   - type: dropdown
+  - type: dropdown
     id: isnew
     attributes:
       label: 是否使用最新代码
